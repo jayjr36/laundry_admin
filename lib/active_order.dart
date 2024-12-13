@@ -1,22 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:laundry_admin/model/orderCard.dart';
 
 class ActiveOrdersPage extends StatelessWidget {
   const ActiveOrdersPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-   // final userId = 'exampleUserId'; 
+    // final userId = 'exampleUserId';
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pending Orders'),
         backgroundColor: Colors.blueAccent,
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('orders')
-            .where('status', whereIn: ['pending', 'received', 'in-progress'])
-            .snapshots(),
+        stream:
+            FirebaseFirestore.instance.collectionGroup('myorders').snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -26,40 +25,35 @@ class ActiveOrdersPage extends StatelessWidget {
             return const Center(child: Text('No pending orders.'));
           }
 
-          final orders = snapshot.data!.docs;
+          // Filter documents manually
+          final orders = snapshot.data!.docs.where((doc) {
+            final status = doc['status'];
+            return status != null &&
+                ['pending', 'received', 'in-progress'].contains(status);
+          }).toList();
+
+          if (orders.isEmpty) {
+            return const Center(child: Text('No pending orders.'));
+          }
 
           return ListView.builder(
             itemCount: orders.length,
             itemBuilder: (context, index) {
               final order = orders[index];
-              final orderId = order['orderId'];
-              final status = order['status'];
+              final orderId = order.id;
+              final orderData = order.data() as Map<String, dynamic>;
+              final timestamp = (orderData['timestamp'] as Timestamp).toDate();
+              final status = orderData['status'];
+              final items = List<Map<String, dynamic>>.from(orderData['items']);
+              final totalPrice = orderData['totalPrice'] ?? 0.0;
 
-              return Card(
-                margin: const EdgeInsets.all(10),
-                elevation: 5,
-                child: ListTile(
-                  title: Text('Order ID: $orderId'),
-                  subtitle: Text('Status: $status'),
-                  trailing: DropdownButton<String>(
-                    value: status,
-                    items: ['pending', 'received', 'in-progress', 'complete']
-                        .map((status) {
-                          return DropdownMenuItem<String>(
-                            value: status,
-                            child: Text(status),
-                          );
-                        }).toList(),
-                    onChanged: (newStatus) {
-                      FirebaseFirestore.instance
-                          .collection('orders')
-                          .doc(order['userId'])
-                          .collection('myorders')
-                          .doc(order.id)
-                          .update({'status': newStatus});
-                    },
-                  ),
-                ),
+              return buildOrderCard(
+                order: order,
+                orderId: orderId,
+                timestamp: timestamp,
+                status: status,
+                items: items,
+                totalPrice: totalPrice,
               );
             },
           );

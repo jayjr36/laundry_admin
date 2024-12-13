@@ -27,10 +27,10 @@ class AdminHomeScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
-                  // You can replace these with dynamic data
-                  _buildOrderSummaryCard('Active Orders', '45'),
-                  _buildOrderSummaryCard('Completed Orders', '200'),
-                  _buildOrderSummaryCard('Cancelled Orders', '12'),
+                  // Real-time Order Summary Cards
+                  _buildOrderSummaryCard('Active Orders'),
+                  _buildOrderSummaryCard('complete'),
+                  _buildOrderSummaryCard('Cancelled Orders'),
                 ],
               ),
             ),
@@ -69,8 +69,30 @@ class AdminHomeScreen extends StatelessWidget {
     );
   }
 
-  // Helper method to build order summary cards
-  Widget _buildOrderSummaryCard(String title, String count) {
+  // Helper method to build order summary cards with real-time counts
+  Widget _buildOrderSummaryCard(String title) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collectionGroup('myorders')
+          .where('status', isEqualTo: title.toLowerCase())
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildSummaryCard(title, '0');
+        }
+
+        final orderCount = snapshot.data!.docs.length;
+        return _buildSummaryCard(title, orderCount.toString());
+      },
+    );
+  }
+
+  // Helper method to build summary cards with dynamic counts
+  Widget _buildSummaryCard(String title, String count) {
     return Card(
       color: Colors.blueAccent,
       margin: const EdgeInsets.symmetric(vertical: 10),
